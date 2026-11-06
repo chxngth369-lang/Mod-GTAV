@@ -147,7 +147,7 @@ let renderToken = 0;          // guards against overlapping filter renders
 
 /* ---------- 3. HELPERS ---------- */
 const $ = (sel, ctx = document) => ctx.querySelector(sel);
-const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
+const $ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isTouchDevice = window.matchMedia('(hover: none), (pointer: coarse)').matches;
@@ -155,7 +155,7 @@ const isTouchDevice = window.matchMedia('(hover: none), (pointer: coarse)').matc
 const imgUrl = (seed, w = 800, h = 500) => `https://picsum.photos/seed/${encodeURIComponent(seed)}/${w}/${h}`;
 const avatarUrl = (n) => `https://i.pravatar.cc/120?img=${n}`;
 const compact = (n) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(n);
-const formatPrice = (p) => (p === 0 ? 'FREE' : `$${p.toFixed(2)}`);
+const formatPrice = (p) => (p === 0 ? 'FREE' : `${p.toFixed(2)}`);
 const handle = (name) => `@${name.replace(/[^a-z0-9]/gi, '')}`;
 const getMod = (id) => MODS.find((m) => m.id === Number(id));
 
@@ -204,23 +204,15 @@ function syncScrollLock() {
 
 /* ---------- 4. BOOT / PRELOADER ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-  initCursor();
-  initNavbar();
-  initMobileMenu();
-  initParticles();
-  initHeroPreview();
-  initMarquee();
-  initFilters();
-  renderMods(false);
-  initGridEvents();
-  initModal();
-  initCart();
-  initCounters();
-  initCarousel();
-  initPricing();
-  initNewsletter();
-  initMisc();
-  initKeyboard();
+  // Each init is isolated so one failure never freezes the whole page
+  const inits = [
+    initCursor, initNavbar, initMobileMenu, initParticles, initHeroPreview, initMarquee,
+    initFilters, () => renderMods(false), initGridEvents, initModal, initCart, initCounters,
+    initCarousel, initPricing, initNewsletter, initMisc, initKeyboard
+  ];
+  inits.forEach((fn) => {
+    try { fn(); } catch (err) { console.error('[ModForge] init error:', err); }
+  });
   hidePreloader();
 });
 
@@ -234,7 +226,8 @@ function hidePreloader() {
     document.body.classList.add('loaded');
     initReveal(); // start reveals only once the page is visible
   };
-  window.addEventListener('load', () => setTimeout(finish, 400));
+  if (document.readyState === 'complete') setTimeout(finish, 400);
+  else window.addEventListener('load', () => setTimeout(finish, 400));
   setTimeout(finish, 2500); // fallback for slow image CDNs
 }
 
@@ -246,6 +239,7 @@ function initCursor() {
   const dot = $('.cursor-dot');
   const ring = $('.cursor-ring');
   const glow = $('.cursor-glow');
+  if (!dot || !ring || !glow) return;
   root.classList.add('custom-cursor');
 
   const pos = { x: innerWidth / 2, y: innerHeight / 2 };
@@ -285,7 +279,7 @@ function initNavbar() {
   window.addEventListener('scroll', onScroll, { passive: true });
 
   // Highlight the link of the section currently in view
-  const links = $$('.nav-link');
+  const links = $('.nav-link');
   const sections = links.map((l) => $(l.getAttribute('href'))).filter(Boolean);
   const io = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
@@ -310,7 +304,7 @@ function initMobileMenu() {
     e.stopPropagation();
     setMenuOpen(!menu.classList.contains('open'));
   });
-  $$('.nav-link', menu).forEach((link) => link.addEventListener('click', () => setMenuOpen(false)));
+  $('.nav-link', menu).forEach((link) => link.addEventListener('click', () => setMenuOpen(false)));
   document.addEventListener('click', (e) => {
     if (menu.classList.contains('open') && !menu.contains(e.target)) setMenuOpen(false);
   });
@@ -436,6 +430,7 @@ function initParticles() {
 function initHeroPreview() {
   const bar = $('#installBar');
   const pct = $('#installPct');
+  if (!bar || !pct) return;
   let progress = 0;
   let hold = 0;
 
@@ -489,7 +484,7 @@ function initFilters() {
   const navSearch = $('#navSearch');
 
   // Fill in category counts
-  $$('.pill', pills).forEach((pill) => {
+  $('.pill', pills).forEach((pill) => {
     const f = pill.dataset.filter;
     const count = f === 'all' ? MODS.length : MODS.filter((m) => m.category === f).length;
     const badge = $('.pill-count', pill);
@@ -523,7 +518,7 @@ function initFilters() {
   });
 
   // Category tiles jump to the grid with the filter applied
-  $$('.category-tile').forEach((tile) => tile.addEventListener('click', () => {
+  $('.category-tile').forEach((tile) => tile.addEventListener('click', () => {
     setFilter(tile.dataset.category);
     $('#mods').scrollIntoView({ behavior: 'smooth' });
   }));
@@ -538,7 +533,7 @@ function initFilters() {
 function setFilter(filter) {
   if (state.filter === filter) return;
   state.filter = filter;
-  $$('.pill').forEach((p) => {
+  $('.pill').forEach((p) => {
     const active = p.dataset.filter === filter;
     p.classList.toggle('active', active);
     p.setAttribute('aria-selected', String(active));
@@ -560,6 +555,7 @@ function resetFilters() {
 /** Slides the gradient highlight beneath the active pill */
 function moveIndicator() {
   const pills = $('#filterPills');
+  if (!pills) return;
   const active = $('.pill.active', pills);
   const indicator = $('.pill-indicator', pills);
   if (!active || !indicator) return;
@@ -596,12 +592,12 @@ function renderMods(animate = true) {
   const paint = () => {
     if (token !== renderToken) return; // a newer render superseded this one
     grid.innerHTML = list.map(modCardHTML).join('');
-    $$('.mod-card', grid).forEach((card) => attachTilt(card, 7));
+    $('.mod-card', grid).forEach((card) => attachTilt(card, 7));
     $('#emptyState').hidden = list.length > 0;
     updateResultsMeta(list.length);
   };
 
-  const current = $$('.mod-card', grid);
+  const current = $('.mod-card', grid);
   if (animate && current.length && !prefersReducedMotion) {
     current.forEach((card) => card.classList.add('is-leaving'));
     setTimeout(paint, 280);
@@ -725,7 +721,7 @@ function quickDownload(mod, btn) {
 
 function completeDownload(mod) {
   mod.downloads += 1;
-  $$(`.mod-card[data-id="${mod.id}"] [data-downloads]`).forEach((el) => { el.textContent = compact(mod.downloads); });
+  $(`.mod-card[data-id="${mod.id}"] [data-downloads]`).forEach((el) => { el.textContent = compact(mod.downloads); });
   const modalStat = $('#modalDownloads');
   if (modalStat && state.activeModal === mod.id) modalStat.textContent = compact(mod.downloads);
   toast({ type: 'success', title: 'Download complete', message: `<b>${mod.title}</b> is ready to install. Happy modding!` });
@@ -738,12 +734,13 @@ function toggleWishlist(id, btn) {
   saveJSON(STORAGE.wishlist, [...state.wishlist]);
 
   // Sync every wishlist button for this mod (card + modal)
-  $$(`[data-wish-id="${id}"], .mod-card[data-id="${id}"] [data-action="wish"]`).concat(btn ? [btn] : [])
-    .forEach((b) => {
-      b.classList.toggle('active', adding);
-      b.setAttribute('aria-pressed', String(adding));
-      b.innerHTML = `<i class="fa-${adding ? 'solid' : 'regular'} fa-heart"></i>`;
-    });
+  const buttons = new Set($(`[data-wish-id="${id}"], .mod-card[data-id="${id}"] [data-action="wish"]`));
+  if (btn) buttons.add(btn);
+  buttons.forEach((b) => {
+    b.classList.toggle('active', adding);
+    b.setAttribute('aria-pressed', String(adding));
+    b.innerHTML = `<i class="fa-${adding ? 'solid' : 'regular'} fa-heart"></i>`;
+  });
 
   toast({
     type: adding ? 'success' : 'info',
@@ -768,17 +765,19 @@ function buildChangelog(mod) {
   ];
 }
 
+const screenshotSeeds = (mod) => [0, 1, 2, 3, 4].map((i) => (i === 0 ? mod.seed : `${mod.seed}-${i}`));
+
 function modalHTML(mod) {
   const tag = TAG_META[mod.tag] || TAG_META.New;
   const inCart = state.cart.includes(mod.id);
   const wished = state.wishlist.has(mod.id);
-  const shots = [0, 1, 2, 3, 4].map((i) => (i === 0 ? mod.seed : `${mod.seed}-${i}`));
+  const shots = screenshotSeeds(mod);
   const changelog = buildChangelog(mod);
   const isFree = mod.price === 0;
 
   const purchaseButtons = isFree
     ? `<button class="btn btn-primary btn-lg" id="modalDownload"><i class="fa-solid fa-download"></i><span>Download Now</span></button>`
-    : `<button class="btn btn-ghost" id="modalCart">${inCart ? '<i class="fa-solid fa-check"></i> In Cart' : '<i class="fa-solid fa-cart-plus"></i> Add to Cart'}</button>
+    : `<button class="btn btn-ghost ${inCart ? 'in-cart' : ''}" id="modalCart">${inCart ? '<i class="fa-solid fa-check"></i> In Cart' : '<i class="fa-solid fa-cart-plus"></i> Add to Cart'}</button>
        <button class="btn btn-primary" id="modalBuy"><i class="fa-solid fa-bolt"></i> Buy Now</button>`;
 
   return `
@@ -926,9 +925,9 @@ function closeModal() {
 
 function bindModalEvents(mod) {
   const body = $('#modalBody');
-  const shots = [0, 1, 2, 3, 4].map((i) => imgUrl(i === 0 ? mod.seed : `${mod.seed}-${i}`, 1280, 800));
+  const shots = screenshotSeeds(mod).map((s) => imgUrl(s, 1280, 800));
   const main = $('#galleryMain');
-  const thumbs = $$('.thumb', body);
+  const thumbs = $('.thumb', body);
   const counter = $('#galleryCounter');
   let current = 0;
 
@@ -949,12 +948,22 @@ function bindModalEvents(mod) {
   state.gallery = { next: () => show(current + 1), prev: () => show(current - 1) };
 
   thumbs.forEach((t) => t.addEventListener('click', () => show(Number(t.dataset.index))));
-  $$('[data-gallery]', body).forEach((b) => b.addEventListener('click', () => (b.dataset.gallery === 'next' ? state.gallery.next() : state.gallery.prev())));
+  $('[data-gallery]', body).forEach((b) => b.addEventListener('click', () => (b.dataset.gallery === 'next' ? state.gallery.next() : state.gallery.prev())));
+
+  // Swipe on the main image (touch devices)
+  let touchX = null;
+  main.parentElement.addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; }, { passive: true });
+  main.parentElement.addEventListener('touchend', (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    if (Math.abs(dx) > 40) (dx < 0 ? state.gallery.next() : state.gallery.prev());
+    touchX = null;
+  });
 
   // Tabs
-  $$('.tab', body).forEach((tab) => tab.addEventListener('click', () => {
-    $$('.tab', body).forEach((t) => t.classList.toggle('active', t === tab));
-    $$('.tab-panel', body).forEach((p) => p.classList.toggle('active', p.dataset.panel === tab.dataset.tab));
+  $('.tab', body).forEach((tab) => tab.addEventListener('click', () => {
+    $('.tab', body).forEach((t) => t.classList.toggle('active', t === tab));
+    $('.tab-panel', body).forEach((p) => p.classList.toggle('active', p.dataset.panel === tab.dataset.tab));
   }));
 
   // Follow
@@ -1001,6 +1010,8 @@ function startCountdown(mod) {
   btn.querySelector('span').textContent = 'Preparing…';
   title.textContent = 'Your download will start shortly';
   status.textContent = 'Verifying files & scanning for threats…';
+  ring.style.setProperty('--p', 0);
+  num.textContent = '5';
 
   state.countdownTimer = setInterval(() => {
     const elapsed = performance.now() - start;
@@ -1143,11 +1154,11 @@ function updateCartUI(bump = false) {
        </div>`;
 
   const total = items.reduce((sum, m) => sum + m.price, 0);
-  $('#cartTotal').textContent = `$${total.toFixed(2)}`;
+  $('#cartTotal').textContent = `${total.toFixed(2)}`;
   $('#checkoutBtn').disabled = count === 0;
 
   // Keep card buttons in sync
-  $$('.mod-card [data-action="cart"]').forEach((btn) => {
+  $('.mod-card [data-action="cart"]').forEach((btn) => {
     const inCart = state.cart.includes(Number(btn.closest('.mod-card').dataset.id));
     btn.classList.toggle('in-cart', inCart);
     btn.innerHTML = cartButtonHTML(inCart);
@@ -1159,7 +1170,7 @@ function checkout() {
   const btn = $('#checkoutBtn');
   if (!state.cart.length) return;
 
-  const items = state.cart.map(getMod);
+  const items = state.cart.map(getMod).filter(Boolean);
   const total = items.reduce((sum, m) => sum + m.price, 0);
   const original = btn.innerHTML;
   btn.disabled = true;
@@ -1174,7 +1185,7 @@ function checkout() {
     toast({
       type: 'success',
       title: 'Purchase complete!',
-      message: `${items.length} mod${items.length > 1 ? 's' : ''} unlocked for $${total.toFixed(2)}. They're now in your library.`,
+      message: `${items.length} mod${items.length > 1 ? 's' : ''} unlocked for ${total.toFixed(2)}. They're now in your library.`,
       duration: 5500
     });
   }, 1600);
@@ -1183,6 +1194,7 @@ function checkout() {
 /* ---------- 14. TOAST NOTIFICATIONS ---------- */
 function toast({ type = 'info', title = '', message = '', duration = 4000, action = null } = {}) {
   const container = $('#toastContainer');
+  if (!container) return;
   const icons = { success: 'fa-circle-check', info: 'fa-circle-info', error: 'fa-triangle-exclamation', download: 'fa-cloud-arrow-down' };
 
   const el = document.createElement('div');
@@ -1231,7 +1243,7 @@ function toast({ type = 'info', title = '', message = '', duration = 4000, actio
 
 /* ---------- 15. STATS COUNTERS ---------- */
 function initCounters() {
-  const counters = $$('.counter');
+  const counters = $('.counter');
   if (!counters.length) return;
 
   const run = (el) => {
@@ -1265,6 +1277,7 @@ function initCarousel() {
   const carousel = $('#carousel');
   const track = $('#carouselTrack');
   const dotsWrap = $('#carouselDots');
+  if (!carousel || !track || !dotsWrap) return;
 
   track.innerHTML = TESTIMONIALS.map((t) => `
     <article class="testimonial-card">
@@ -1280,14 +1293,14 @@ function initCarousel() {
       </div>
     </article>`).join('');
 
-  const slides = $$('.testimonial-card', track);
+  const slides = $('.testimonial-card', track);
   let index = 0, perView = 1, maxIndex = 0, timer = null;
 
   const update = () => {
     const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
     const width = slides[0].getBoundingClientRect().width;
     track.style.transform = `translateX(${-index * (width + gap)}px)`;
-    $$('button', dotsWrap).forEach((d, i) => d.classList.toggle('active', i === index));
+    $('button', dotsWrap).forEach((d, i) => d.classList.toggle('active', i === index));
     slides.forEach((s, i) => s.classList.toggle('is-visible', i >= index && i < index + perView));
   };
 
@@ -1331,6 +1344,7 @@ function initCarousel() {
     if (Math.abs(dx) > 50) { go(index + (dx < 0 ? 1 : -1)); start(); }
     startX = null;
   });
+  window.addEventListener('pointercancel', () => { startX = null; });
 
   window.addEventListener('resize', debounce(measure, 150));
   measure();
@@ -1340,23 +1354,24 @@ function initCarousel() {
 /* ---------- 17. PRICING, NEWSLETTER & MISC ---------- */
 function initPricing() {
   const toggle = $('#billingToggle');
-  const labels = $$('[data-billing-label]');
+  if (!toggle) return;
+  const labels = $('[data-billing-label]');
 
   toggle.addEventListener('click', () => {
     const yearly = toggle.getAttribute('aria-checked') !== 'true';
     toggle.setAttribute('aria-checked', String(yearly));
     labels.forEach((l) => l.classList.toggle('active', l.dataset.billingLabel === (yearly ? 'yearly' : 'monthly')));
 
-    $$('.amount').forEach((el) => {
+    $('.amount').forEach((el) => {
       el.classList.remove('flip');
       void el.offsetWidth;
       el.textContent = yearly ? el.dataset.yearly : el.dataset.monthly;
       el.classList.add('flip');
     });
-    $$('.plan-note').forEach((n) => { n.textContent = yearly ? n.dataset.yearlyNote : n.dataset.monthlyNote; });
+    $('.plan-note').forEach((n) => { n.textContent = yearly ? n.dataset.yearlyNote : n.dataset.monthlyNote; });
   });
 
-  $$('[data-plan]').forEach((btn) => btn.addEventListener('click', () => {
+  $('[data-plan]').forEach((btn) => btn.addEventListener('click', () => {
     const plan = btn.dataset.plan;
     toast(plan === 'Explorer'
       ? { type: 'success', title: 'Welcome aboard, Explorer!', message: 'Your free account is ready. Start downloading mods right away.' }
@@ -1366,6 +1381,7 @@ function initPricing() {
 
 function initNewsletter() {
   const form = $('#newsletterForm');
+  if (!form) return;
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const input = $('input', form);
@@ -1379,4 +1395,77 @@ function initNewsletter() {
       toast({ type: 'error', title: 'Invalid email', message: 'Please enter a valid email address.' });
       return;
     }
+    form.classList.remove('shake');
     toast({ type: 'success', title: "You're subscribed!", message: `Weekly mod drops will land in <b>${escapeHTML(email)}</b>.` });
+    input.value = '';
+  });
+}
+
+function initMisc() {
+  const year = $('#year');
+  if (year) year.textContent = new Date().getFullYear();
+
+  $('#uploadBtn')?.addEventListener('click', () => toast({
+    type: 'info',
+    title: 'Creator Studio',
+    message: 'The upload portal is coming soon. Pick the <b>Creator</b> plan to get early access.'
+  }));
+}
+
+/* ---------- 18. SCROLL REVEAL & KEYBOARD ---------- */
+function initReveal() {
+  const els = $('.reveal');
+  if (prefersReducedMotion || !('IntersectionObserver' in window)) {
+    els.forEach((el) => el.classList.add('in-view'));
+    return;
+  }
+
+  const io = new IntersectionObserver((entries, obs) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      const el = entry.target;
+      // Stagger sibling reveals unless a delay is set inline
+      if (!el.style.getPropertyValue('--d')) {
+        const siblings = [...el.parentElement.children].filter((c) => c.classList.contains('reveal'));
+        el.style.setProperty('--d', `${siblings.indexOf(el) * 90}ms`);
+      }
+      el.classList.add('in-view');
+      obs.unobserve(el);
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  els.forEach((el) => io.observe(el));
+}
+
+function initKeyboard() {
+  document.addEventListener('keydown', (e) => {
+    const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '');
+
+    // "/" focuses search
+    if (e.key === '/' && !typing) {
+      e.preventDefault();
+      if (window.innerWidth >= 768) {
+        $('#navSearch').focus();
+      } else {
+        $('#mods').scrollIntoView({ behavior: 'smooth' });
+        $('#modSearch').focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    // Esc closes modal → drawer → menu
+    if (e.key === 'Escape') {
+      if ($('#modModal').classList.contains('open')) closeModal();
+      else if ($('#cartDrawer').classList.contains('open')) closeDrawer();
+      else setMenuOpen(false);
+      if (typing) document.activeElement.blur();
+      return;
+    }
+
+    // Arrow keys navigate the modal gallery
+    if (state.activeModal && state.gallery && !typing) {
+      if (e.key === 'ArrowRight') state.gallery.next();
+      if (e.key === 'ArrowLeft') state.gallery.prev();
+    }
+  });
+}
